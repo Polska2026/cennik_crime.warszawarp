@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giełda Towarów Zakazanych | WARSZAWA RP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&family=Oswald:wght@500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        :root {
+            --bg-dark: #0f0f13;
+            --bg-card: #1a1a20;
+            --text-main: #e0e0e0;
+            --accent-green: #2ecc71; /* Wzrost */
+            --accent-red: #e74c3c;   /* Spadek */
+            --accent-gold: #d4af37;
+            --border-color: #333;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: 'Inter', sans-serif;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1, h2 {
+            font-family: 'Oswald', sans-serif;
+            text-transform: uppercase;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+
+        h1 { color: var(--accent-gold); letter-spacing: 2px; }
+        
+        /* --- Layout --- */
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* --- Sekcja Wykresu --- */
+        .chart-container {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            height: 320px;
+        }
+
+        /* --- Karty Towarów --- */
+        .market-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-left: 4px solid var(--accent-gold);
+            border-radius: 8px;
+            padding: 20px;
+            transition: transform 0.2s;
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(212, 175, 55, 0.1);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .drug-name {
+            font-family: 'Oswald', sans-serif;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+
+        .drug-unit {
+            font-size: 0.8rem;
+            color: #888;
+            margin-bottom: 5px;
+        }
+
+        .drug-price {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-gold);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .trend-arrow {
+            font-size: 1rem;
+        }
+        
+        .trend-up { color: var(--accent-green); }
+        .trend-down { color: var(--accent-red); }
+        .trend-neutral { color: #555; }
+
+        .drug-desc {
+            font-size: 0.85rem;
+            color: #aaa;
+            margin-top: 10px;
+            border-top: 1px solid #333;
+            padding-top: 10px;
+        }
+
+        /* --- Panel Admina (Ukryty) --- */
+        #admin-panel {
+            display: none; /* Domyślnie ukryty */
+            margin-top: 50px;
+            background: #222;
+            padding: 20px;
+            border: 1px solid var(--accent-red);
+            border-radius: 10px;
+        }
+
+        .admin-controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .control-group label {
+            font-size: 0.8rem;
+            margin-bottom: 5px;
+        }
+
+        .control-group input {
+            background: #111;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 8px;
+            border-radius: 4px;
+        }
+
+        .login-btn {
+            background: transparent;
+            border: 1px solid #333;
+            color: #333;
+            padding: 5px 10px;
+            cursor: pointer;
+            margin-top: 50px;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .login-btn:hover { border-color: #555; color: #555; }
+
+        /* --- Średnie ceny (nowa sekcja) --- */
+        .avg-prices {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 18px;
+            margin-top: 30px;
+        }
+        .avg-prices h2 { color: var(--accent-gold); margin: 0 0 12px 0; font-family: 'Oswald', sans-serif; }
+        .avg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+        .avg-card { background: #121212; padding: 10px 12px; border-radius: 6px; border-left: 4px solid var(--accent-gold); }
+        .avg-name { font-weight: 700; margin-bottom: 4px; }
+        .avg-unit { color: #888; font-size: 0.9rem; margin-bottom: 6px; }
+        .avg-price { font-size: 1.05rem; color: var(--accent-gold); font-weight: 700; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📈 Notowania Giełdowe Warszawa RP</h1>
+    <p style="text-align: center; color: #888; margin-bottom: 30px;">Aktualne ceny rynkowe w RP (Update: Live / Symulacja nieobecności / jest to tylko pod RP)</p>
+
+    <div class="chart-container">
+        <canvas id="marketChart"></canvas>
+    </div>
+
+    <div class="market-grid" id="cards-container">
+        </div>
+
+    <button class="login-btn" onclick="toggleAdmin()">Panel opiekuna</button>
+
+    <div id="admin-panel">
+        <h2 style="color: var(--accent-red);">⚠️ Panel Zarządzania Cenami</h2>
+        <p style="font-size: 0.8rem; color: #888; margin-bottom: 15px;">Zmieniając cenę tutaj, aktualizujesz wykres i strzałki trendów (lokalnie).</p>
+        <div class="admin-controls" id="admin-inputs">
+            </div>
+    </div>
+
+    <!-- Sekcja ze średnimi cenami dodana na prośbę użytkownika -->
+    <section class="avg-prices" aria-label="Średnie ceny">
+        <h2>Średnie ceny</h2>
+        <div class="avg-grid">
+            <div class="avg-card">
+                <div class="avg-name">🌿 Marihuana</div>
+                <div class="avg-unit">1 paczka (10g)</div>
+                <div class="avg-price">850</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">🌿 Silver Haze</div>
+                <div class="avg-unit">1 paczka (10g)</div>
+                <div class="avg-price">1 000</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">🟫 Hasz</div>
+                <div class="avg-unit">1 porcja (10g)</div>
+                <div class="avg-price">1 400</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">❄️ Kokaina</div>
+                <div class="avg-unit">1 porcja (15g)</div>
+                <div class="avg-price">1 100</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">🪨 Crack</div>
+                <div class="avg-unit">1 porcja (10g)</div>
+                <div class="avg-price">1 500</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">💉 Heroina</div>
+                <div class="avg-unit">1 fiolka (5g)</div>
+                <div class="avg-price">2 000</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">💊 Morfina</div>
+                <div class="avg-unit">1 fiolka (5g)</div>
+                <div class="avg-price">1 800</div>
+            </div>
+            <div class="avg-card">
+                <div class="avg-name">☠️ Fentanyl</div>
+                <div class="avg-unit">1 fiolka (2g)</div>
+                <div class="avg-price">3 500</div>
+            </div>
+        </div>
+    </section>
+
+</div>
+
+<script>
+    // --- KONFIG ---
+    const STORAGE_KEY = 'rp_market_data';
+    const LAST_UPDATE_KEY = 'rp_market_last_update';
+    const AUTO_UPDATE_INTERVAL_MS = 60 * 1000; // 1 minuta
+    const SIMULATION_CAP_MINUTES = 10080; // limit symulacji do 7 dni (opcjonalne zabezpieczenie)
+
+    // --- DOMYŚLNE PRODUKTY (fallback) ---
+    const defaultProducts = [
+        { id: 'marihuana', name: '🌿 Marihuana RP', unit: '1 paczka (10g)', price: 850, prevPrice: 850, desc: 'Standard RP, niski próg wejścia.' },
+        { id: 'haze', name: '🌿 Silver Haze RP', unit: '1 paczka (10g)', price: 1000, prevPrice: 1000, desc: 'Odmiana marihuany, droższa.' },
+        { id: 'hasz', name: '🟫 Hasz RP', unit: '1 porcja (10g)', price: 1400, prevPrice: 1400, desc: 'Mocniejszy produkt z konopii.' },
+        { id: 'koka', name: '❄️ Kokaina RP', unit: '1 porcja (15g)', price: 1100, prevPrice: 1100, desc: 'Wymagający sprzęt, średni risk.' },
+        { id: 'crack', name: '🪨 Crack RP', unit: '1 porcja (10g)', price: 1500, prevPrice: 1500, desc: 'Pochodna kokainy, wysokie ryzyko.' },
+        { id: 'heroina', name: '💉 Heroina RP', unit: '1 fiolka (5g)', price: 2000, prevPrice: 2000, desc: 'Laboratorium, średni/high risk.' },
+        { id: 'morfina', name: '💊 Morfina RP', unit: '1 fiolka (5g)', price: 1800, prevPrice: 1800, desc: 'Średnie ryzyko, wymaga aparatury.' },
+        { id: 'fentanyl', name: '☠️ Fentanyl RP', unit: '1 fiolka (2g)', price: 3500, prevPrice: 3500, desc: 'Najcięższa i ryzykowna substancja.' }
+    ];
+
+    // --- ŁADUJ DANE Z LocalStorage ---
+    function loadStoredProducts() {
+        try {
+            const raw = localStorage.getItem(STORAGE_KEY);
+            if (!raw) return defaultProducts.map(p => ({...p}));
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed) || parsed.length === 0) return defaultProducts.map(p => ({...p}));
+            // ensure prevPrice exists
+            parsed.forEach(p => { if (typeof p.prevPrice === 'undefined') p.prevPrice = p.price; });
+            return parsed;
+        } catch (e) {
+            console.warn('Błąd parsowania stored data, używam domyślnych:', e);
+            return defaultProducts.map(p => ({...p}));
+        }
+    }
+
+    function saveProducts(products) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+    }
+
+    // --- ZARZĄDZANIE CZASEM OSTATNIEJ AKTUALIZACJI ---
+    function getLastUpdate() {
+        const raw = localStorage.getItem(LAST_UPDATE_KEY);
+        if (!raw) return null;
+        const t = parseInt(raw, 10);
+        return isNaN(t) ? null : new Date(t);
+    }
+    function setLastUpdate(date = new Date()) {
+        localStorage.setItem(LAST_UPDATE_KEY, String(date.getTime()));
+    }
+
+    // --- LOSOWA ZMIANA JEDNEGO PRODUKTU (procent od -5% do +5%) ---
+    function applyRandomChangeOnce(product) {
+        const changePct = (Math.random() * 10) - 5; // [-5, +5)
+        const old = product.price || 1;
+        const newPrice = Math.max(1, Math.round(old * (1 + changePct / 100)));
+        product.prevPrice = old;
+        product.price = newPrice;
+    }
+
+    // --- ZASTOSUJ JEDNO LOSOWANIE DLA WSZYSTKICH PRODUKTÓW ---
+    function randomizeAllOnce(products) {
+        products.forEach(p => applyRandomChangeOnce(p));
+    }
+
+    // --- SYMULACJA "N" MINUT NIEOBECNOŚCI (wykonuje N losowań) ---
+    function simulateMissingMinutes(products, minutes) {
+        if (minutes <= 0) return;
+        const m = Math.min(minutes, SIMULATION_CAP_MINUTES);
+        // Wydajniejsze: powielamy N razy mnożenie, ale trzymamy prevPrice z przed ostatniego kroku
+        for (let i = 0; i < m; i++) {
+            products.forEach(p => {
+                applyRandomChangeOnce(p);
+            });
+        }
+    }
+
+    // --- INICJALIZACJA WYKRESU (po załadowaniu produktów) ---
+    let marketChart;
+    function initChart(products) {
+        const ctx = document.getElementById('marketChart').getContext('2d');
+        if (marketChart) marketChart.destroy();
+        marketChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: products.map(p => p.name),
+                datasets: [{
+                    label: 'Cena rynkowa ($)',
+                    data: products.map(p => p.price),
+                    backgroundColor: [
+                        'rgba(46, 204, 113, 0.6)',
+                        'rgba(46, 204, 113, 0.8)',
+                        'rgba(160, 82, 45, 0.7)',
+                        'rgba(255, 255, 255, 0.7)',
+                        'rgba(200, 200, 200, 0.7)',
+                        'rgba(231, 76, 60, 0.7)',
+                        'rgba(52, 152, 219, 0.7)',
+                        'rgba(142, 68, 173, 0.7)'
+                    ],
+                    borderColor: 'rgba(0,0,0,0.5)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { beginAtZero: true, grid: { color: '#333' }, ticks: { color: '#888' } },
+                    x: { grid: { display: false }, ticks: { color: '#ccc', font: { size: 11 } } }
+                },
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+
+    // --- GENEROWANIE KART I ADMINA ---
+    const cardsContainer = document.getElementById('cards-container');
+    const adminContainer = document.getElementById('admin-inputs');
+
+    function renderUI(products) {
+        cardsContainer.innerHTML = '';
+        adminContainer.innerHTML = '';
+
+        products.forEach((product, index) => {
+            let trendHtml = '<span class="trend-arrow trend-neutral">➖</span>';
+            let trendText = '';
+            
+            if (product.price > product.prevPrice) {
+                trendHtml = '<span class="trend-arrow trend-up">⬆</span>';
+                trendText = '<span style="font-size:0.7em; color:var(--accent-green)"> (+Wzrost)</span>';
+            } else if (product.price < product.prevPrice) {
+                trendHtml = '<span class="trend-arrow trend-down">⬇</span>';
+                trendText = '<span style="font-size:0.7em; color:var(--accent-red)"> (-Spadek)</span>';
+            }
+
+            const cardHTML = `
+                <div class="card">
+                    <div class="card-header">
+                        <span class="drug-name">${product.name}</span>
+                        ${trendHtml}
+                    </div>
+                    <div class="drug-unit">${product.unit}</div>
+                    <div class="drug-price">
+                        $${product.price}
+                    </div>
+                    ${trendText}
+                    <div class="drug-desc">${product.desc}</div>
+                </div>
+            `;
+            cardsContainer.innerHTML += cardHTML;
+
+            const inputHTML = `
+                <div class="control-group">
+                    <label>${product.name}</label>
+                    <input type="number" value="${product.price}" onchange="updatePrice(${index}, this.value)">
+                </div>
+            `;
+            adminContainer.innerHTML += inputHTML;
+        });
+    }
+
+    // --- AKTUALIZACJA CEN PRZEZ ADMINA (lokalnie) ---
+    function updatePrice(index, newPrice) {
+        newPrice = parseInt(newPrice);
+        if (isNaN(newPrice) || newPrice < 1) return;
+        
+        products[index].prevPrice = products[index].price;
+        products[index].price = newPrice;
+
+        // Zapisz i odśwież
+        setLastUpdate(new Date());
+        saveProducts(products);
+
+        marketChart.data.datasets[0].data[index] = newPrice;
+        marketChart.update();
+        renderUI(products);
+    }
+
+    // --- FUNKCJA WYWOŁYWANA CO 1 MINUTĘ (podczas aktywnej sesji) ---
+    function randomizeAllPricesDuringSession() {
+        randomizeAllOnce(products);
+        setLastUpdate(new Date());
+        saveProducts(products);
+        // Aktualizuj wykres (raz, po zmianach)
+        marketChart.data.datasets[0].data = products.map(p => p.price);
+        marketChart.update();
+        renderUI(products);
+    }
+
+    // --- LOGOWANIE/ADMIN ---
+    function toggleAdmin() {
+        const panel = document.getElementById('admin-panel');
+        if (panel.style.display === 'block') {
+            panel.style.display = 'none';
+        } else {
+            const password = prompt("Podaj kod dostępu szefa:");
+            if (password === "admin0107wrp") {
+                panel.style.display = 'block';
+                window.scrollTo(0, document.body.scrollHeight);
+            } else {
+                alert("Błędny kod.");
+            }
+        }
+    }
+
+    // --- START (główna sekwencja) ---
+    let products = loadStoredProducts();
+
+    // Sprawdź kiedy była ostatnia aktualizacja i zasymuluj minuty nieobecności
+    (function simulateAbsenceAndInit() {
+        const last = getLastUpdate();
+        const now = new Date();
+
+        if (!last) {
+            // brak zapisu — ustaw teraz i zapisz produkty
+            setLastUpdate(now);
+            saveProducts(products);
+        } else {
+            const diffMs = now - last;
+            const minutesElapsed = Math.floor(diffMs / 60000);
+            if (minutesElapsed > 0) {
+                // Symuluj losowania za minuty, które minęły
+                simulateMissingMinutes(products, minutesElapsed);
+                // Zapisz wynik i ustaw nową datę ostatniej aktualizacji
+                setLastUpdate(now);
+                saveProducts(products);
+            }
+        }
+
+        // Inicjalizuj wykres/UI
+        initChart(products);
+        renderUI(products);
+
+        // W czasie aktywnej sesji nadal wykonuj aktualizację co 1 minutę
+        setInterval(() => {
+            randomizeAllPricesDuringSession();
+        }, AUTO_UPDATE_INTERVAL_MS);
+    })();
+
+</script>
+
+</body>
+</html>
